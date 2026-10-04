@@ -37,9 +37,14 @@ body { background:var(--bg); color:var(--text); font-family:'Sora','Noto Sans KR
 .list-arrow { color:var(--muted); font-size:20px; margin-left:auto; }
 
 
-.list-del { margin-left:auto; background:none; border:none; font-size:16px; cursor:pointer; opacity:.6; padding:6px; }
+.list-actions { margin-left:auto; display:flex; gap:2px; }
+.list-actions + .list-arrow { margin-left:8px; }
+.list-del { background:none; border:none; font-size:16px; cursor:pointer; opacity:.6; padding:6px; }
 .list-del:hover { opacity:1; }
-.list-del + .list-arrow { margin-left:8px; }
+/* 읽어주기 스위치 */
+.tts-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted); padding:6px 12px; border-radius:99px; font-size:12px; font-family:inherit; cursor:pointer; }
+.tts-btn.on { color:var(--accent); border-color:var(--accent); background:rgba(124,109,250,0.12); }
+.tts-bar { display:flex; gap:8px; justify-content:flex-end; margin:0 0 10px; }
 /* 불러오기 */
 .imp-box { background:var(--surface); border:1px dashed var(--border); border-radius:16px; padding:18px 22px; margin-top:20px; }
 .imp-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; font-size:13px; }
@@ -147,7 +152,7 @@ body { background:var(--bg); color:var(--text); font-family:'Sora','Noto Sans KR
 .complete-btn.secondary { background:var(--surface); border:1px solid var(--border); color:var(--text); }
 .complete-btn:hover { opacity:0.85; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -157,10 +162,17 @@ body { background:var(--bg); color:var(--text); font-family:'Sora','Noto Sans KR
     <div class="home-title">단어 <span>마스터</span></div>
     <div class="home-sub">단어장을 선택해서 학습을 시작하세요</div>
   </div>
-  <div id="list-container"></div>
+  <div id="list-container"><noscript>JavaScript가 꺼져 있어서 단어장을 표시할 수 없어요. 브라우저(Safari/Chrome)에서 직접 열어 주세요.</noscript></div>
+  <div class="imp-box" style="margin-top:12px">
+    <div class="list-name">🔊 읽어주기</div>
+    <div class="imp-row">
+      <button class="tts-btn" data-tts="en" onclick="toggleTts('en')"></button>
+      <button class="tts-btn" data-tts="ko" onclick="toggleTts('ko')"></button>
+    </div>
+  </div>
   <div class="imp-box">
     <div class="list-name">📥 새 단어장 만들기 (파일 불러오기)</div>
-    <div class="list-meta" style="margin-top:4px">엑셀(.xlsx)·CSV · A열 단어 / B열 뜻 / C열 발음 / D열 예문 / E열 예문 해석</div>
+    <div class="list-meta" style="margin-top:4px">엑셀(.xlsx)·CSV · A열 단어 / B열 뜻 (C 발음 · D 예문 · E 예문 해석은 비워도 돼요). 예문이 비어 있으면 Claude가 자동으로 만들어 줘요 ✨</div>
     <div class="imp-row">
       <button class="back-btn" style="margin:0" onclick="document.getElementById('imp-file').click()">📂 파일 선택해서 단어장 만들기</button>
       <button class="back-btn" style="margin:0" onclick="downloadTemplate()">양식 받기</button>
@@ -234,6 +246,7 @@ body { background:var(--bg); color:var(--text); font-family:'Sora','Noto Sans KR
     <div class="study-stage-name" id="study-label"></div>
     <div class="word-counter" id="word-counter"></div>
   </div>
+  <div class="tts-bar"><button class="tts-btn" data-tts="en" onclick="toggleTts('en')"></button><button class="tts-btn" data-tts="ko" onclick="toggleTts('ko')"></button></div>
   <div class="progress-wrap"><div class="progress-fill" id="prog"></div></div>
   <div class="retry-banner" id="retry-banner">🔄 오답 단어 다시 도전 중!</div>
   <div id="study-content"></div>
@@ -377,6 +390,20 @@ function playFanfare(){
 
 // TTS
 const VOICE_NAME='Samantha';
+const tts={en:true,ko:true};
+try{ Object.assign(tts,JSON.parse(localStorage.getItem('vm_tts')||'{}')); }catch(e){}
+function renderTts(){
+  document.querySelectorAll('[data-tts]').forEach(b=>{
+    const k=b.dataset.tts; b.classList.toggle('on',!!tts[k]);
+    b.textContent=(k==='en'?'🇺🇸 영어 ':'🇰🇷 한국어 ')+(tts[k]?'ON':'OFF');
+  });
+}
+function toggleTts(k){
+  tts[k]=!tts[k];
+  try{ localStorage.setItem('vm_tts',JSON.stringify(tts)); }catch(e){}
+  if(!tts[k]&&window.speechSynthesis) speechSynthesis.cancel();
+  renderTts();
+}
 function pickVoice(){
   const all=speechSynthesis.getVoices();
   return all.find(v=>v.name===VOICE_NAME)
@@ -386,7 +413,7 @@ function pickVoice(){
     ||all.find(v=>v.lang.toLowerCase().startsWith('en'));
 }
 function speak(text, onEnd){
-  if(!window.speechSynthesis) return;
+  if(!window.speechSynthesis||!tts.en) return;
   speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text);
   u.lang='en-US'; u.rate=0.9;
@@ -395,6 +422,33 @@ function speak(text, onEnd){
   if(onEnd) u.onend=onEnd;
   speechSynthesis.speak(u);
 }
+
+
+// 영어 → 한국어 순서로 이어서 읽기
+function pickKoVoice(){
+  const ko=speechSynthesis.getVoices().filter(v=>v.lang.replace('_','-').toLowerCase().startsWith('ko'));
+  const score=v=>{ const n=v.name; let x=0;
+    if(/natural|neural|online/i.test(n)) x+=10;
+    if(/premium|프리미엄/i.test(n)) x+=9;
+    if(/enhanced|향상/i.test(n)) x+=7;
+    if(/sunhi|yuna|sora|google/i.test(n)) x+=3;
+    if(/injoon|male/i.test(n)) x-=2;
+    return x; };
+  return ko.sort((a,b)=>score(b)-score(a))[0]||null;
+}
+function koText(t){ return String(t||'').replace(/[()~]/g,'').replace(/\s*\/\s*/g,', ').replace(/\s+/g,' ').trim(); }
+function mkUtt(text,lang){
+  const u=new SpeechSynthesisUtterance(text); u.lang=lang;
+  u.rate=lang==='ko-KR'?1:0.9;
+  const v=lang==='ko-KR'?pickKoVoice():pickVoice(); if(v) u.voice=v;
+  return u;
+}
+function speakSeq(items){
+  if(!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  items.forEach(it=>{ const on=it[1]==='ko-KR'?tts.ko:tts.en; if(it[0]&&on) speechSynthesis.speak(mkUtt(it[0],it[1])); });
+}
+function speakPair(en,ko){ speakSeq([[en,'en-US'],[koText(ko),'ko-KR']]); }
 
 // 화면 전환
 function showScreen(id){
@@ -489,7 +543,7 @@ function renderFC(w){
 function flipCard(){
   playClick(); fcFlipped=!fcFlipped;
   document.getElementById('fc').classList.toggle('flipped',fcFlipped);
-  if(fcFlipped){ const w=queue[idx]; if(w&&w.ex) speak(w.ex); }
+  if(fcFlipped){ const w=queue[idx]; if(w) speakSeq([[koText(w.meaning),'ko-KR'],[w.ex,'en-US'],[koText(w.exKr),'ko-KR']]); }
   else if(window.speechSynthesis) speechSynthesis.cancel();
 }
 function fcNext(knew){ playClick(); if(!knew) wrongQueue.push(queue[idx]); idx++; render(); }
@@ -530,6 +584,7 @@ function pickKr(btn,chosen,correct){
     fb.innerHTML=`❌ 오답! 정답: <b>${correct}</b>`; fb.className='feedback wrong-fb show';
     wrongQueue.push(queue[idx]); wrongCount++;
   }
+  speakPair(queue[idx].word,queue[idx].meaning);
   nb.classList.add('show');
 }
 
@@ -552,7 +607,7 @@ function pickEn(btn,chosen,correct){
   if(chosen.trim().toLowerCase()===correct.trim().toLowerCase()){
     playCorrect(); btn.classList.add('correct');
     fb.innerHTML='✅ 정답!'; fb.className='feedback correct-fb show';
-    correctCount++; speak(correct);
+    correctCount++; speakPair(correct,queue[idx].meaning);
   } else {
     playWrong(); btn.classList.add('wrong');
     document.querySelectorAll('.choice-btn').forEach(b=>{ if(b.textContent.trim().toLowerCase()===correct.trim().toLowerCase()) b.classList.add('correct'); });
@@ -570,7 +625,7 @@ function renderCopy(w){
         <div class="card-hint">ENGLISH</div>
         <div class="copy-word">${w.word}</div>
         <div class="quiz-word-pron">${w.pron||''}</div>
-        <button class="sound-btn" onclick="speak('${esc(w.word)}')">🔊 발음</button>
+        <button class="sound-btn" onclick="speakPair(queue[idx].word,queue[idx].meaning)">🔊 발음</button>
       </div>
       <div class="copy-side">
         <div class="card-hint">한국어</div>
@@ -586,7 +641,7 @@ function renderCopy(w){
     </div>
     <div class="feedback" id="fb"></div>
     <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
-  speak(w.word);
+  speakPair(w.word,w.meaning);
   setTimeout(()=>{ const el=document.getElementById('ans-en'); if(el) el.focus(); },50);
 }
 function checkCopy(){
@@ -623,7 +678,7 @@ function renderSent(w){
       </div>
       <div style="font-size:18px;line-height:1.8;font-weight:700;margin-bottom:8px">${w.ex}</div>
       <div style="font-size:14px;color:var(--muted)">${w.exKr||''}</div>
-      <button class="sound-btn" onclick="speak(queue[idx].ex)">🔊 문장 듣기</button>
+      <button class="sound-btn" onclick="speakPair(queue[idx].ex,queue[idx].exKr)">🔊 문장 듣기</button>
     </div>
     <div class="input-section">
       <input class="answer-input" id="ans" placeholder="영어 문장을 따라 쓰세요..." autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.isComposing)checkSent()">
@@ -631,7 +686,7 @@ function renderSent(w){
     </div>
     <div class="feedback" id="fb"></div>
     <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
-  speak(w.ex);
+  speakPair(w.ex,w.exKr);
   setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); },50);
 }
 function checkSent(){
@@ -687,6 +742,7 @@ function checkW4(){
     fb.innerHTML=`❌ 오답!<br><span style="font-size:13px">정답: <b>${w.meaning}</b></span>`;
     fb.className='feedback wrong-fb show'; wrongQueue.push(queue[idx]); wrongCount++;
   }
+  speakPair(w.word,w.meaning);
   nb.classList.add('show');
 }
 
@@ -735,7 +791,7 @@ function checkW5(){
   if(input===correct){
     playCorrect(); ansEl.classList.add('correct');
     fb.innerHTML='✅ 정답!'; fb.className='feedback correct-fb show';
-    correctCount++; speak(w.word);
+    correctCount++; speakPair(w.word,w.meaning);
   } else {
     playWrong(); ansEl.classList.add('wrong');
     fb.innerHTML=`❌ 오답!<br><span style="font-size:13px">정답: <b>${w.word}</b></span>`;
@@ -774,7 +830,7 @@ function checkFill(){
     playCorrect(); ansEl.classList.add('correct');
     fb.innerHTML=`✅ 정답!<br><span style="font-size:13px;margin-top:4px;display:block">${w.ex}</span>`;
     fb.className='feedback correct-fb show'; correctCount++;
-    speak(w.ex); // 예문 전체 발음
+    speakPair(w.ex,w.exKr); // 예문 + 해석
   } else {
     playWrong(); ansEl.classList.add('wrong');
     fb.innerHTML=`❌ 오답!<br><span style="font-size:13px">정답: <b>${w.word}</b><br>${w.ex}</span>`;
@@ -818,16 +874,48 @@ try{
   if(Array.isArray(sv)) sv.forEach(l=>{ if(l&&l.id&&Array.isArray(l.words)&&l.words.length) lists.push({id:l.id,name:l.name||'내 단어장',icon:'📄',words:l.words}); });
 }catch(e){}
 function saveLists(){
-  try{ localStorage.setItem('vm_lists',JSON.stringify(lists.filter(l=>!l.builtin).map(l=>({id:l.id,name:l.name,words:l.words})))); }catch(e){}
+  try{ localStorage.setItem('vm_lists',JSON.stringify(lists.filter(l=>!l.builtin&&!l.cloud).map(l=>({id:l.id,name:l.name,words:l.words})))); }catch(e){}
 }
 function setWords(arr){ WORDS.length=0; arr.forEach(x=>WORDS.push(x)); }
 function escH(t){ return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let dbRef=null, canWrite=true;
+function cloudBody(l){ return {name:l.name,words:l.words,createdAt:l.at||Date.now()}; }
+async function syncList(l){
+  if(l.cloud&&dbRef){
+    try{ await dbRef.doc('lists/'+l.id).set(cloudBody(l)); }
+    catch(e){ impMsg('☁️ 사이트 저장에 실패했어요 ('+(e&&e.code?e.code:'오류')+')','err'); }
+  } else saveLists();
+}
+async function initCloud(){
+  try{
+    if(!(window.claude&&claude.use)) return;
+    dbRef=await claude.use('db'); if(!dbRef) return;
+    try{ const u=await claude.use('user'); if(u){ canWrite=(await u.can('data.write'))!==false; } }catch(e){}
+    dbRef.collection('lists').onSnapshot(snap=>{
+      const cloud=[];
+      snap.docs.forEach(d=>{ const x=d.data(); if(x&&Array.isArray(x.words)&&x.words.length) cloud.push({id:d.id,name:x.name||'단어장',icon:'☁️',words:x.words.map(w=>({...w})),cloud:true,at:x.createdAt||0}); });
+      cloud.sort((a,b)=>a.at-b.at);
+      const ids=new Set(cloud.map(c=>c.id));
+      lists=[...lists.filter(l=>!l.cloud&&!ids.has(l.id)),...cloud];
+      renderHome();
+    },()=>{});
+    // 이 기기에 있던 로컬 단어장을 사이트로 올리기
+    if(canWrite){
+      let movedAny=false;
+      for(const l of lists.filter(x=>!x.builtin&&!x.cloud)){
+        try{ await dbRef.doc('lists/'+l.id).set({name:l.name,words:l.words,createdAt:Number(String(l.id).slice(1))||Date.now()}); l.moved=true; movedAny=true; }
+        catch(e){ break; }
+      }
+      if(movedAny){ lists=lists.filter(l=>!l.moved); saveLists(); renderHome(); }
+    }
+  }catch(e){}
+}
 function renderHome(){
   document.getElementById('list-container').innerHTML=lists.map(l=>`
     <div class="list-card" onclick="openList('${l.id}')">
       <div class="list-icon">${l.icon}</div>
       <div><div class="list-name">${escH(l.name)}</div><div class="list-meta">${l.tag?l.tag+' · ':''}${l.words.length}개 단어</div></div>
-      ${l.builtin?'':`<button class="list-del" title="삭제" onclick="event.stopPropagation();deleteList('${l.id}')">🗑</button>`}
+      ${(l.builtin||(l.cloud&&!canWrite))?'':`<div class="list-actions">${l.words.some(w=>!w.ex)?`<button class="list-del" title="예문 자동 생성" onclick="event.stopPropagation();genExamples('${l.id}')">✨</button>`:''}<button class="list-del" title="삭제" onclick="event.stopPropagation();deleteList('${l.id}')">🗑</button></div>`}
       <div class="list-arrow">›</div>
     </div>`).join('');
 }
@@ -838,10 +926,11 @@ function openList(id){
   document.getElementById('stage-title').textContent=l.name;
   selectList();
 }
-function deleteList(id){
+async function deleteList(id){
   const l=lists.find(x=>x.id===id); if(!l||l.builtin) return;
   if(!confirm(`"${l.name}" 단어장을 삭제할까요?`)) return;
-  lists=lists.filter(x=>x.id!==id); delete doneMap[id]; saveLists(); renderHome();
+  if(l.cloud&&dbRef){ try{ await dbRef.doc('lists/'+id).delete(); }catch(e){ impMsg('❌ 삭제 권한이 없어요.','err'); return; } }
+  lists=lists.filter(x=>x.id!==id); delete doneMap[id]; if(!l.cloud) saveLists(); renderHome();
 }
 function impMsg(t,cls){ const m=document.getElementById('imp-msg'); m.textContent=t; m.className='imp-msg '+(cls||''); }
 
@@ -885,10 +974,48 @@ async function importFile(inp){
     const base=f.name.replace(/\.[^.]+$/,'');
     const name=prompt(`새 단어장 이름을 정해 주세요 (${list.length}개 단어)`,base);
     if(name===null){ impMsg('취소했어요.'); return; }
-    lists.push({id:'l'+Date.now(),name:name.trim()||base,icon:'📄',words:list});
-    saveLists(); renderHome();
-    impMsg(`✅ "${name.trim()||base}" 단어장을 만들었어요 (${list.length}개 단어).`+(list.length<4?' ⚠️ 4지선다는 단어가 4개 이상일 때 잘 동작해요.':''),'ok');
+    const nl={id:'l'+Date.now(),name:name.trim()||base,icon:'📄',words:list,at:Date.now()};
+    if(dbRef&&canWrite){ try{ await dbRef.doc('lists/'+nl.id).set(cloudBody(nl)); nl.cloud=true; nl.icon='☁️'; }catch(e){} }
+    lists.push(nl); if(!nl.cloud) saveLists(); renderHome();
+    impMsg(`✅ "${nl.name}" 단어장을 만들었어요 (${list.length}개 단어). `
+      +(nl.cloud?'☁️ 사이트에 저장돼서 다른 기기에서도 보여요.':'이 기기에만 저장됐어요 (claude.ai에 로그인한 소유자 계정에서 열면 다른 기기와 공유돼요).')
+      +(list.length<4?' ⚠️ 4지선다는 단어가 4개 이상일 때 잘 동작해요.':''),'ok');
+    const missing=list.filter(w=>!w.ex).length;
+    if(missing&&await getSample()&&confirm(`예문이 없는 단어가 ${missing}개예요.\nClaude가 예문과 해석을 자동으로 만들까요?`)) genExamples(nl.id);
   }catch(e){ impMsg('❌ '+e.message,'err'); }
+}
+
+// ===== 예문 자동 생성 (claude.ai 게시 페이지의 sample 기능 사용) =====
+async function getSample(){
+  try{ return (window.claude&&claude.use)?await claude.use('sample'):null; }catch(e){ return null; }
+}
+async function genExamples(id){
+  const l=lists.find(x=>x.id===id); if(!l) return;
+  const todo=l.words.filter(w=>!w.ex);
+  if(!todo.length){ impMsg('이미 모든 단어에 예문이 있어요.'); return; }
+  const sample=await getSample();
+  if(!sample){ impMsg('❌ 자동 생성은 claude.ai에서 연 게시 페이지에서만 돼요. 파일을 Claude 채팅에 올리면 예문을 채워 드려요.','err'); return; }
+  let done=0;
+  try{
+    for(let i=0;i<todo.length;i+=12){
+      const batch=todo.slice(i,i+12);
+      impMsg(`✨ 예문 만드는 중... (${done}/${todo.length})`);
+      const prompt='아래 영단어와 한국어 뜻마다 자연스러운 영어 예문 1개(8~16단어)와 그 한국어 해석을 만들어 주세요. '
+        +'예문에는 해당 단어를 철자 변형 없이 원형 그대로 포함하세요. 뜻에 "/"가 있으면 첫 번째 뜻을 기준으로 쓰세요. '
+        +'JSON 배열만 출력하세요(설명, 코드블록 금지): [{"word":"...","ex":"...","exKr":"..."}]\n'
+        +JSON.stringify(batch.map(w=>({word:w.word,meaning:w.meaning})));
+      let res=await sample.json(prompt);
+      if(!Array.isArray(res)) res=res&&res.items?res.items:[];
+      const map={}; res.forEach(r=>{ if(r&&r.word) map[String(r.word).toLowerCase()]=r; });
+      batch.forEach(w=>{ const r=map[w.word.toLowerCase()]; if(r&&r.ex&&r.exKr){ w.ex=String(r.ex).trim(); w.exKr=String(r.exKr).trim(); } });
+      done+=batch.length; await syncList(l); renderHome();
+    }
+    const left=l.words.filter(w=>!w.ex).length;
+    impMsg(left?`⚠️ ${todo.length-left}개 만들었어요. ${left}개는 실패했으니 ✨를 다시 눌러 주세요.`:`✅ "${l.name}" 예문 ${todo.length}개를 만들었어요!`,left?'':'ok');
+  }catch(e){
+    await syncList(l); renderHome();
+    impMsg(`❌ 예문 생성이 중단됐어요 (${e&&e.code?e.code:'오류'}). ✨를 다시 눌러 이어서 만들 수 있어요.`,'err');
+  }
 }
 function downloadTemplate(){
   const csv='\uFEFFword,meaning,pron,ex,exKr\n'
@@ -898,7 +1025,11 @@ function downloadTemplate(){
   a.download='단어_양식.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 // 홈 단어장 목록 표시
-renderHome();
+renderTts();
+initCloud();
+try{ renderHome(); }catch(err){
+  document.getElementById('list-container').innerHTML='<div class="imp-msg err">단어장을 불러오지 못했어요: '+escH(err.message)+'<br>브라우저 데이터를 지우고 새로고침해 보세요.</div>';
+}
 </script>
 </body>
 </html>
