@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>단어 마스터</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=DM+Mono:wght@400;500&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d0d12;
+  --surface: #15151e;
+  --surface2: #1e1e2a;
+  --border: rgba(255,255,255,0.08);
+  --accent: #7c6dfa;
+  --accent2: #fa6d8f;
+  --text: #eeeef5;
+  --muted: #7a7a9a;
+  --correct: #4ade80;
+  --wrong: #f87171;
+  --warning: #fbbf24;
+}
+body { background:var(--bg); color:var(--text); font-family:'Sora','Noto Sans KR',sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; }
+.screen { display:none; width:100%; max-width:680px; padding:32px 20px 80px; }
+.screen.active { display:block; }
+
+/* 홈 */
+.home-hero { text-align:center; padding:48px 0 40px; }
+.home-title { font-size:36px; font-weight:800; letter-spacing:-1px; margin-bottom:10px; }
+.home-title span { color:var(--accent); }
+.home-sub { color:var(--muted); font-size:15px; margin-bottom:40px; }
+.list-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px 24px; margin-bottom:12px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:16px; }
+.list-card:hover { border-color:var(--accent); transform:translateX(4px); }
+.list-icon { font-size:28px; width:48px; text-align:center; flex-shrink:0; }
+.list-name { font-size:16px; font-weight:700; margin-bottom:3px; }
+.list-meta { font-size:12px; color:var(--muted); }
+.list-arrow { color:var(--muted); font-size:20px; margin-left:auto; }
+
+
+.list-del { margin-left:auto; background:none; border:none; font-size:16px; cursor:pointer; opacity:.6; padding:6px; }
+.list-del:hover { opacity:1; }
+.list-del + .list-arrow { margin-left:8px; }
+/* 불러오기 */
+.imp-box { background:var(--surface); border:1px dashed var(--border); border-radius:16px; padding:18px 22px; margin-top:20px; }
+.imp-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; font-size:13px; }
+.imp-row label { cursor:pointer; }
+.imp-msg { margin-top:12px; font-size:13px; line-height:1.6; color:var(--muted); }
+.imp-msg.ok { color:var(--correct); } .imp-msg.err { color:var(--wrong); }
+
+/* 단계 선택 */
+.back-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:8px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-family:inherit; margin-bottom:24px; transition:all 0.15s; }
+.back-btn:hover { background:var(--surface2); }
+.section-title { font-size:22px; font-weight:800; margin-bottom:6px; }
+.section-sub { color:var(--muted); font-size:13px; margin-bottom:24px; }
+.stage-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.stage-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px 18px; cursor:pointer; transition:all 0.2s; position:relative; }
+.stage-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+.stage-card.done { border-color:rgba(74,222,128,0.35); }
+.stage-num { font-family:'DM Mono',monospace; font-size:11px; color:var(--accent); letter-spacing:1px; margin-bottom:8px; }
+.stage-card.done .stage-num { color:var(--correct); }
+.stage-name { font-size:15px; font-weight:700; margin-bottom:4px; }
+.stage-desc { font-size:12px; color:var(--muted); line-height:1.5; }
+.stage-badge { position:absolute; top:14px; right:14px; font-size:16px; }
+
+/* 학습 헤더 */
+.study-header { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.study-stage-name { font-size:14px; font-weight:700; color:var(--accent); }
+.word-counter { margin-left:auto; font-family:'DM Mono',monospace; font-size:13px; color:var(--muted); }
+.progress-wrap { background:var(--surface2); border-radius:99px; height:4px; margin-bottom:24px; overflow:hidden; }
+.progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width 0.4s; }
+
+/* 플래시 카드 */
+.flashcard-wrap { perspective:1200px; margin-bottom:20px; }
+.flashcard { width:100%; height:240px; transform-style:preserve-3d; transition:transform 0.5s cubic-bezier(0.4,0,0.2,1); cursor:pointer; border-radius:20px; position:relative; }
+.flashcard.flipped { transform:rotateY(180deg); }
+.card-face { position:absolute; inset:0; border-radius:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:28px; backface-visibility:hidden; -webkit-backface-visibility:hidden; border:1px solid var(--border); }
+.card-front { background:var(--surface); }
+.card-back { background:var(--surface2); transform:rotateY(180deg); }
+.card-hint { font-size:11px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:12px; }
+.card-word { font-size:34px; font-weight:800; letter-spacing:-1px; text-align:center; margin-bottom:8px; }
+.card-pron { font-family:'DM Mono',monospace; font-size:14px; color:var(--accent); margin-bottom:6px; }
+.card-meaning { font-size:20px; font-weight:700; text-align:center; margin-bottom:8px; line-height:1.5; }
+.card-example { font-size:13px; color:var(--muted); text-align:center; line-height:1.6; }
+.card-example-kr { font-size:12px; color:var(--muted); text-align:center; margin-top:4px; opacity:0.7; }
+.sound-btn { background:rgba(124,109,250,0.15); border:1px solid rgba(124,109,250,0.3); color:var(--accent); padding:6px 14px; border-radius:99px; cursor:pointer; font-size:13px; font-family:inherit; margin-top:8px; transition:all 0.15s; }
+.sound-btn:hover { background:rgba(124,109,250,0.25); }
+.fc-controls { display:flex; gap:10px; }
+.fc-btn { flex:1; padding:14px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; transition:all 0.15s; }
+.fc-btn:hover { background:var(--surface2); }
+.fc-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.fc-btn.primary:hover { opacity:0.85; }
+
+/* 4지선다 */
+.quiz-word { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:36px 24px; text-align:center; margin-bottom:16px; }
+.quiz-word-text { font-size:32px; font-weight:800; letter-spacing:-1px; margin-bottom:8px; }
+.quiz-word-pron { font-family:'DM Mono',monospace; font-size:14px; color:var(--accent); }
+.choices { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.choice-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:16px 12px; border-radius:14px; cursor:pointer; font-size:14px; font-family:inherit; line-height:1.4; transition:all 0.15s; text-align:center; }
+.choice-btn:hover:not(:disabled) { border-color:var(--accent); background:rgba(124,109,250,0.1); }
+.choice-btn.correct { border-color:var(--correct); background:rgba(74,222,128,0.12); color:var(--correct); }
+.choice-btn.wrong { border-color:var(--wrong); background:rgba(248,113,113,0.12); color:var(--wrong); }
+.choice-btn:disabled { cursor:default; }
+
+/* 주관식 */
+.input-section { margin-bottom:16px; }
+.answer-input { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 20px; color:var(--text); font-size:16px; font-family:'Noto Sans KR',sans-serif; outline:none; transition:border-color 0.15s; margin-bottom:10px; }
+.answer-input:focus { border-color:var(--accent); }
+.answer-input.correct { border-color:var(--correct); background:rgba(74,222,128,0.08); }
+.answer-input.wrong { border-color:var(--wrong); background:rgba(248,113,113,0.08); }
+.submit-btn { width:100%; background:var(--accent); border:none; color:#fff; padding:16px; border-radius:14px; font-size:16px; font-weight:700; font-family:inherit; cursor:pointer; transition:all 0.15s; }
+.submit-btn:hover { opacity:0.85; }
+
+/* 따라 쓰기 */
+.copy-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.copy-side { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:24px 16px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:150px; }
+.copy-word { font-size:26px; font-weight:800; word-break:break-word; }
+.copy-mean { font-size:19px; font-weight:700; color:var(--accent); line-height:1.5; }
+
+/* 피드백 */
+.feedback { border-radius:14px; padding:14px 16px; margin-bottom:12px; font-size:14px; line-height:1.7; display:none; }
+.feedback.show { display:block; }
+.feedback.correct-fb { background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); color:var(--correct); }
+.feedback.wrong-fb { background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); color:var(--wrong); }
+.feedback.partial-fb { background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.3); color:var(--warning); }
+.next-btn { width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:14px; border-radius:14px; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; transition:all 0.15s; display:none; }
+.next-btn.show { display:block; }
+.next-btn:hover { background:var(--surface); border-color:var(--accent); }
+
+/* 오답 배너 */
+.retry-banner { background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.3); border-radius:12px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:var(--warning); display:none; }
+.retry-banner.show { display:block; }
+
+/* 완료 */
+.complete-wrap { text-align:center; padding:40px 0; }
+.complete-emoji { font-size:64px; margin-bottom:20px; }
+.complete-title { font-size:28px; font-weight:800; margin-bottom:10px; }
+.complete-sub { color:var(--muted); font-size:15px; margin-bottom:6px; }
+.score-display { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px; margin:24px 0; display:flex; justify-content:center; gap:40px; }
+.score-item { text-align:center; }
+.score-num { font-size:32px; font-weight:800; margin-bottom:4px; }
+.score-num.green { color:var(--correct); }
+.score-num.red { color:var(--wrong); }
+.score-label { font-size:12px; color:var(--muted); }
+.complete-btns { display:flex; gap:10px; }
+.complete-btn { flex:1; padding:14px; border-radius:14px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; transition:all 0.15s; }
+.complete-btn.primary { background:var(--accent); border:none; color:#fff; }
+.complete-btn.secondary { background:var(--surface); border:1px solid var(--border); color:var(--text); }
+.complete-btn:hover { opacity:0.85; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- 홈 -->
+<div id="screen-home" class="screen active">
+  <div class="home-hero">
+    <div class="home-title">단어 <span>마스터</span></div>
+    <div class="home-sub">단어장을 선택해서 학습을 시작하세요</div>
+  </div>
+  <div id="list-container"></div>
+  <div class="imp-box">
+    <div class="list-name">📥 새 단어장 만들기 (파일 불러오기)</div>
+    <div class="list-meta" style="margin-top:4px">엑셀(.xlsx)·CSV · A열 단어 / B열 뜻 / C열 발음 / D열 예문 / E열 예문 해석</div>
+    <div class="imp-row">
+      <button class="back-btn" style="margin:0" onclick="document.getElementById('imp-file').click()">📂 파일 선택해서 단어장 만들기</button>
+      <button class="back-btn" style="margin:0" onclick="downloadTemplate()">양식 받기</button>
+    </div>
+    <input type="file" id="imp-file" accept=".xlsx,.xls,.csv,.txt" hidden onchange="importFile(this)">
+    <div class="imp-msg" id="imp-msg"></div>
+  </div>
+</div>
+
+<!-- 단계 선택 -->
+<div id="screen-stage" class="screen">
+  <button class="back-btn" onclick="goHome()">← 목록으로</button>
+  <div class="section-title" id="stage-title">해커스 영단어 1</div>
+  <div class="section-sub">순서대로 학습하면 더 효과적이에요</div>
+  <div class="stage-grid">
+    <div class="stage-card" id="card-1" onclick="startStage(1)">
+      <div class="stage-num">STEP 01</div>
+      <div class="stage-name">플래시 카드</div>
+      <div class="stage-desc">단어·뜻·예문 카드로 확인</div>
+      <div class="stage-badge" id="badge-1"></div>
+    </div>
+    <div class="stage-card" id="card-2" onclick="startStage(2)">
+      <div class="stage-num">STEP 02</div>
+      <div class="stage-name">4지선다</div>
+      <div class="stage-desc">영어 보고 한국어 뜻 선택</div>
+      <div class="stage-badge" id="badge-2"></div>
+    </div>
+    <div class="stage-card" id="card-3" onclick="startStage(3)">
+      <div class="stage-num">STEP 03</div>
+      <div class="stage-name">4지선다 (역방향)</div>
+      <div class="stage-desc">한국어 보고 영어 단어 선택</div>
+      <div class="stage-badge" id="badge-3"></div>
+    </div>
+    <div class="stage-card" id="card-4" onclick="startStage(4)">
+      <div class="stage-num">STEP 04</div>
+      <div class="stage-name">따라 쓰기</div>
+      <div class="stage-desc">영어·뜻을 보며 두 칸에 쓰기</div>
+      <div class="stage-badge" id="badge-4"></div>
+    </div>
+    <div class="stage-card" id="card-5" onclick="startStage(5)">
+      <div class="stage-num">STEP 05</div>
+      <div class="stage-name">문장 따라 쓰기</div>
+      <div class="stage-desc">예문과 해석을 보며 영어 문장 쓰기</div>
+      <div class="stage-badge" id="badge-5"></div>
+    </div>
+    <div class="stage-card" id="card-6" onclick="startStage(6)">
+      <div class="stage-num">STEP 06</div>
+      <div class="stage-name">한글 뜻 쓰기</div>
+      <div class="stage-desc">영어 단어 보고 한국어 입력</div>
+      <div class="stage-badge" id="badge-6"></div>
+    </div>
+    <div class="stage-card" id="card-7" onclick="startStage(7)">
+      <div class="stage-num">STEP 07</div>
+      <div class="stage-name">영어 단어 쓰기</div>
+      <div class="stage-desc">한국어 뜻 보고 영어 입력</div>
+      <div class="stage-badge" id="badge-7"></div>
+    </div>
+    <div class="stage-card" id="card-8" onclick="startStage(8)">
+      <div class="stage-num">STEP 08</div>
+      <div class="stage-name">빈칸 채우기</div>
+      <div class="stage-desc">예문에서 단어 맞추기</div>
+      <div class="stage-badge" id="badge-8"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 학습 -->
+<div id="screen-study" class="screen">
+  <div class="study-header">
+    <button class="back-btn" style="margin-bottom:0" onclick="goStage()">← 뒤로</button>
+    <div class="study-stage-name" id="study-label"></div>
+    <div class="word-counter" id="word-counter"></div>
+  </div>
+  <div class="progress-wrap"><div class="progress-fill" id="prog"></div></div>
+  <div class="retry-banner" id="retry-banner">🔄 오답 단어 다시 도전 중!</div>
+  <div id="study-content"></div>
+</div>
+
+<!-- 완료 -->
+<div id="screen-complete" class="screen">
+  <div class="complete-wrap">
+    <div class="complete-emoji">🎉</div>
+    <div class="complete-title" id="comp-title">단계 완료!</div>
+    <div class="complete-sub" id="comp-sub"></div>
+    <div class="score-display">
+      <div class="score-item"><div class="score-num green" id="sc-ok">0</div><div class="score-label">정답</div></div>
+      <div class="score-item"><div class="score-num red" id="sc-no">0</div><div class="score-label">오답</div></div>
+      <div class="score-item"><div class="score-num" id="sc-tot">0</div><div class="score-label">전체</div></div>
+    </div>
+    <div class="complete-btns">
+      <button class="complete-btn secondary" onclick="goStage()">단계 선택으로</button>
+      <button class="complete-btn primary" onclick="nextStageAuto()">다음 단계 →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORDS = [
+  {word:"exploit",meaning:"(부당하게) 이용하다",pron:"ɪkˈsplɔɪt",ex:"Some companies exploit workers for cheap labor.",exKr:"일부 기업들은 저렴한 노동력을 위해 노동자들을 착취한다."},
+  {word:"account for",meaning:"(이유 등을) 설명하다 / (부분, 비율을) 차지하다 / 원인이 되다",pron:"əˈkaʊnt fɔːr",ex:"How do you account for the sudden drop in sales?",exKr:"갑작스러운 매출 하락을 어떻게 설명하시겠습니까?"},
+  {word:"particular",meaning:"특정한, 특별한",pron:"pəˈtɪkjʊlər",ex:"She has a particular interest in marine biology.",exKr:"그녀는 해양 생물학에 특별한 관심을 가지고 있다."},
+  {word:"prominent",meaning:"눈에 띄는 / 중요한",pron:"ˈprɒmɪnənt",ex:"He is a prominent figure in the art world.",exKr:"그는 예술계에서 눈에 띄는 인물이다."},
+  {word:"replenish",meaning:"보충하다",pron:"rɪˈplɛnɪʃ",ex:"We need to replenish our water supply before the hike.",exKr:"하이킹 전에 물 공급을 보충해야 한다."},
+  {word:"indigenous",meaning:"토착의",pron:"ɪnˈdɪdʒɪnəs",ex:"The museum displays artifacts from indigenous cultures.",exKr:"그 박물관은 토착 문화의 유물들을 전시한다."},
+  {word:"pinpoint",meaning:"(위치 등을) 정확히 찾아내다 / 정확한",pron:"ˈpɪnpɔɪnt",ex:"Scientists pinpointed the exact location of the signal.",exKr:"과학자들은 신호의 정확한 위치를 찾아냈다."},
+  {word:"annihilate",meaning:"전멸시키다",pron:"əˈnaɪəleɪt",ex:"The army annihilated the enemy forces within hours.",exKr:"군대는 몇 시간 안에 적군을 전멸시켰다."},
+  {word:"conversely",meaning:"반대로",pron:"ˈkɒnvɜːrsli",ex:"He is outgoing; conversely, his brother is very shy.",exKr:"그는 외향적이다. 반대로 그의 형은 매우 수줍음이 많다."},
+  {word:"investigate",meaning:"조사하다",pron:"ɪnˈvɛstɪɡeɪt",ex:"Police are investigating the cause of the fire.",exKr:"경찰이 화재 원인을 조사하고 있다."},
+  {word:"assure",meaning:"확신시키다, 보장하다",pron:"əˈʃʊər",ex:"I assure you that everything will be fine.",exKr:"모든 것이 잘 될 것이라고 확신시켜 드립니다."},
+  {word:"entire",meaning:"전체의, 전부의",pron:"ɪnˈtaɪər",ex:"She read the entire book in one sitting.",exKr:"그녀는 한 번에 앉아서 책 전체를 읽었다."},
+  {word:"compensate for",meaning:"~을 보상하다 / 상쇄하다",pron:"ˈkɒmpənseɪt fɔːr",ex:"Nothing can compensate for the loss of a loved one.",exKr:"사랑하는 사람을 잃은 것을 보상할 수 있는 것은 없다."},
+  {word:"postulate",meaning:"(자명한 일로) 가정하다, 주장하다",pron:"ˈpɒstjʊleɪt",ex:"The scientist postulated a new theory of gravity.",exKr:"그 과학자는 중력에 관한 새로운 이론을 가정했다."},
+  {word:"magnify",meaning:"확대하다",pron:"ˈmæɡnɪfaɪ",ex:"The lens magnifies objects up to ten times.",exKr:"렌즈는 물체를 최대 10배까지 확대한다."},
+  {word:"afford",meaning:"주다, 제공하다",pron:"əˈfɔːrd",ex:"Education affords children better opportunities.",exKr:"교육은 아이들에게 더 나은 기회를 제공한다."},
+  {word:"conclusive",meaning:"결정적인, 확실한",pron:"kənˈkluːsɪv",ex:"The evidence was conclusive enough for a conviction.",exKr:"그 증거는 유죄 판결을 내리기에 충분히 결정적이었다."},
+  {word:"unsophisticated",meaning:"단순한, 복잡하지 않은",pron:"ˌʌnsəˈfɪstɪkeɪtɪd",ex:"The design is unsophisticated but effective.",exKr:"그 디자인은 단순하지만 효과적이다."},
+  {word:"justified",meaning:"정당한",pron:"ˈdʒʌstɪfaɪd",ex:"Was the use of force justified in that situation?",exKr:"그 상황에서 무력 사용이 정당했는가?"},
+  {word:"deliberate",meaning:"의도적인, 계획적인 / 신중한",pron:"dɪˈlɪbərɪt",ex:"The mistake was deliberate, not accidental.",exKr:"그 실수는 우연이 아니라 의도적이었다."},
+  {word:"depend on",meaning:"~에 의존하다, 의지하다",pron:"dɪˈpɛnd ɒn",ex:"Children depend on their parents for guidance.",exKr:"아이들은 지도를 위해 부모에게 의존한다."},
+  {word:"substantiate",meaning:"입증하다",pron:"səbˈstænʃieɪt",ex:"Can you substantiate your claims with evidence?",exKr:"증거로 주장을 입증할 수 있습니까?"},
+  {word:"successively",meaning:"잇따라서",pron:"səkˈsɛsɪvli",ex:"The team won the championship successively for three years.",exKr:"그 팀은 3년 연속으로 우승을 차지했다."},
+  {word:"pervasive",meaning:"퍼지는, 만연하는",pron:"pərˈveɪsɪv",ex:"Social media has a pervasive influence on modern life.",exKr:"소셜 미디어는 현대 생활에 만연한 영향을 미친다."},
+  {word:"strenuous",meaning:"격렬한, 힘든",pron:"ˈstrɛnjʊəs",ex:"Avoid strenuous exercise after surgery.",exKr:"수술 후 격렬한 운동을 피하세요."},
+  {word:"sleek",meaning:"매끄러운",pron:"sliːk",ex:"The new phone has a sleek, modern design.",exKr:"새 휴대폰은 매끄럽고 현대적인 디자인을 가지고 있다."},
+  {word:"invoke",meaning:"빌다, 기원하다",pron:"ɪnˈvoʊk",ex:"The shaman invoked the spirits of the ancestors.",exKr:"무당이 조상들의 영혼에게 빌었다."},
+  {word:"impressive",meaning:"인상적인, 대단한",pron:"ɪmˈprɛsɪv",ex:"Her performance was truly impressive.",exKr:"그녀의 공연은 정말 인상적이었다."},
+  {word:"conjunction",meaning:"결합",pron:"kənˈdʒʌŋkʃən",ex:"The words 'and' and 'but' are conjunctions.",exKr:"'and'와 'but'은 접속사이다."},
+  {word:"astoundingly",meaning:"몹시 놀랍게도",pron:"əˈstaʊndɪŋli",ex:"The project was completed astoundingly fast.",exKr:"그 프로젝트는 몹시 놀랍게도 빠르게 완성되었다."},
+  {word:"aftermath",meaning:"여파, 결과",pron:"ˈæftərmæθ",ex:"The city struggled in the aftermath of the earthquake.",exKr:"도시는 지진의 여파 속에서 힘겨워했다."},
+  {word:"promptly",meaning:"신속하게, 즉시",pron:"ˈprɒmptli",ex:"She promptly replied to all the emails.",exKr:"그녀는 모든 이메일에 신속하게 답장했다."},
+  {word:"subdue",meaning:"정복하다",pron:"səbˈdjuː",ex:"It took hours to subdue the fire.",exKr:"화재를 진압하는 데 몇 시간이 걸렸다."},
+  {word:"extant",meaning:"현존하는",pron:"ˈɛkstənt",ex:"The extant manuscripts provide valuable historical data.",exKr:"현존하는 필사본들은 귀중한 역사적 데이터를 제공한다."},
+  {word:"sedentary",meaning:"주로 앉아있는, 정착성의",pron:"ˈsɛdənteri",ex:"A sedentary lifestyle can lead to health problems.",exKr:"주로 앉아있는 생활 방식은 건강 문제를 야기할 수 있다."},
+  {word:"eliminate",meaning:"없애다, 제거하다",pron:"ɪˈlɪmɪneɪt",ex:"We must eliminate all sources of contamination.",exKr:"우리는 모든 오염원을 제거해야 한다."},
+  {word:"perfect",meaning:"개선하다, 완벽하게 하다",pron:"ˈpɜːrfɪkt",ex:"They worked hard to perfect their technique.",exKr:"그들은 기술을 완벽하게 하기 위해 열심히 노력했다."},
+  {word:"genuine",meaning:"진짜의",pron:"ˈdʒɛnjʊɪn",ex:"This is a genuine leather bag, not a fake.",exKr:"이것은 가짜가 아닌 진짜 가죽 가방이다."},
+  {word:"dominant",meaning:"우세한, 주요한",pron:"ˈdɒmɪnənt",ex:"English has become the dominant language in science.",exKr:"영어는 과학에서 우세한 언어가 되었다."},
+  {word:"unrivaled",meaning:"비할 데 없는",pron:"ʌnˈraɪvəld",ex:"Her skill as a pianist is unrivaled.",exKr:"피아니스트로서의 그녀의 실력은 비할 데 없다."},
+  {word:"paradox",meaning:"모순된 말",pron:"ˈpærədɒks",ex:"It is a paradox that the more you learn, the less you know.",exKr:"많이 배울수록 모르는 게 많아진다는 것은 모순된 말이다."},
+  {word:"neglect",meaning:"무시하다 / (해야 할 일을) 하지 않다, 잊다",pron:"nɪˈɡlɛkt",ex:"Do not neglect your health while chasing success.",exKr:"성공을 좇다가 건강을 소홀히 하지 마라."},
+  {word:"recall",meaning:"상기하다, 생각해내다",pron:"rɪˈkɔːl",ex:"She could recall every detail of that day.",exKr:"그녀는 그날의 모든 세부 사항을 기억해낼 수 있었다."},
+  {word:"ascend",meaning:"올라가다",pron:"əˈsɛnd",ex:"It took six hours to ascend the mountain.",exKr:"산을 오르는 데 여섯 시간이 걸렸다."},
+  {word:"solid",meaning:"확고한, 견고한",pron:"ˈsɒlɪd",ex:"The bridge is built on solid foundations.",exKr:"다리는 견고한 기반 위에 지어졌다."},
+  {word:"contour",meaning:"윤곽, 외형",pron:"ˈkɒntʊər",ex:"The map showed the contours of the mountain range.",exKr:"지도는 산맥의 윤곽을 보여주었다."},
+  {word:"inhabit",meaning:"거주하다",pron:"ɪnˈhæbɪt",ex:"Polar bears inhabit the Arctic region.",exKr:"북극곰은 북극 지역에 거주한다."},
+  {word:"irrevocably",meaning:"돌이킬 수 없게",pron:"ɪˈrɛvəkəbli",ex:"The decision irrevocably changed her life.",exKr:"그 결정은 그녀의 삶을 돌이킬 수 없게 바꾸었다."},
+  {word:"superficially",meaning:"표면적으로",pron:"ˌsuːpəˈfɪʃəli",ex:"The report only superficially addressed the issue.",exKr:"그 보고서는 그 문제를 표면적으로만 다루었다."},
+  {word:"stunted",meaning:"발달이 저해된, 성장을 멈춘",pron:"ˈstʌntɪd",ex:"Poor nutrition led to stunted growth in children.",exKr:"불량한 영양 섭취는 아이들의 발달 저해를 초래했다."},
+  {word:"malleable",meaning:"두들겨 펼 수 있는",pron:"ˈmæliəbəl",ex:"Gold is highly malleable and can be shaped easily.",exKr:"금은 매우 유연하여 쉽게 모양을 만들 수 있다."},
+  {word:"mean",meaning:"의미하다, 나타내다 / 평균",pron:"miːn",ex:"What does this symbol mean in mathematics?",exKr:"이 기호는 수학에서 무엇을 의미하는가?"},
+  {word:"exclude",meaning:"차단하다, 배제하다",pron:"ɪkˈskluːd",ex:"The policy excludes part-time workers from benefits.",exKr:"그 정책은 시간제 근로자들을 혜택에서 배제한다."},
+  {word:"mature",meaning:"성숙해지다",pron:"məˈtjʊər",ex:"Children mature at different rates.",exKr:"아이들은 각자 다른 속도로 성숙해진다."},
+  {word:"pillar",meaning:"기둥",pron:"ˈpɪlər",ex:"Education is a pillar of a healthy society.",exKr:"교육은 건강한 사회의 기둥이다."},
+  {word:"encroachment",meaning:"잠식, 침입",pron:"ɪnˈkroʊtʃmənt",ex:"Urban encroachment threatens the natural habitat.",exKr:"도시의 잠식이 자연 서식지를 위협하고 있다."},
+  {word:"no wonder",meaning:"놀랄 일이 아닌",pron:"noʊ ˈwʌndər",ex:"No wonder she is tired; she worked all night.",exKr:"그녀가 피곤한 것은 놀랄 일이 아니다; 밤새 일했으니까."}
+];
+
+// 상태
+let currentStage = 1;
+let queue = [], wrongQueue = [], isRetryMode = false;
+let idx = 0, correctCount = 0, wrongCount = 0;
+let stageDone = {};
+
+// 효과음
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let actx;
+function getCtx(){ if(!actx) actx=new AudioCtx(); return actx; }
+
+function playCorrect(){
+  const ctx=getCtx();
+  [523,659,784,1047].forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value=f; o.type='sine';
+    const t=ctx.currentTime+i*0.1;
+    g.gain.setValueAtTime(0.28,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.3);
+    o.start(t); o.stop(t+0.3);
+  });
+}
+function playWrong(){
+  const ctx=getCtx();
+  [220,185].forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value=f; o.type='sawtooth';
+    const t=ctx.currentTime+i*0.15;
+    g.gain.setValueAtTime(0.13,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
+    o.start(t); o.stop(t+0.25);
+  });
+}
+function playClick(){
+  const ctx=getCtx();
+  const o=ctx.createOscillator(),g=ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.frequency.value=900; o.type='sine';
+  g.gain.setValueAtTime(0.08,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.07);
+  o.start(); o.stop(ctx.currentTime+0.07);
+}
+function playFanfare(){
+  const ctx=getCtx();
+  [523,659,784,1047,784,1047,1319].forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value=f; o.type='triangle';
+    const t=ctx.currentTime+i*0.13;
+    g.gain.setValueAtTime(0.22,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.35);
+    o.start(t); o.stop(t+0.35);
+  });
+}
+
+// TTS
+const VOICE_NAME='Samantha';
+function pickVoice(){
+  const all=speechSynthesis.getVoices();
+  return all.find(v=>v.name===VOICE_NAME)
+    ||all.find(v=>/samantha/i.test(v.name))
+    ||all.find(v=>/google us english|zira|aria|jenny/i.test(v.name))
+    ||all.find(v=>v.lang.replace('_','-').toLowerCase()==='en-us')
+    ||all.find(v=>v.lang.toLowerCase().startsWith('en'));
+}
+function speak(text, onEnd){
+  if(!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='en-US'; u.rate=0.9;
+  const v=pickVoice();
+  if(v) u.voice=v;
+  if(onEnd) u.onend=onEnd;
+  speechSynthesis.speak(u);
+}
+
+// 화면 전환
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goHome(){ showScreen('screen-home'); }
+function selectList(){ playClick(); updateBadges(); showScreen('screen-stage'); }
+function goStage(){ updateBadges(); showScreen('screen-stage'); }
+function nextStageAuto(){ const n=currentStage+1; if(n<=8) startStage(n); else goStage(); }
+
+function updateBadges(){
+  for(let s=1;s<=8;s++){
+    const b=document.getElementById('badge-'+s);
+    const c=document.getElementById('card-'+s);
+    if(b) b.textContent=stageDone[s]?'✅':'';
+    if(c) c.classList.toggle('done',!!stageDone[s]);
+  }
+}
+
+// 셔플
+function shuffle(a){ const r=[...a]; for(let i=r.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]]; } return r; }
+
+// 단계 시작
+const stageNames=['','플래시 카드','4지선다 (영→한)','4지선다 (한→영)','따라 쓰기','문장 따라 쓰기','한글 뜻 쓰기','영어 단어 쓰기','빈칸 채우기'];
+function startStage(s){
+  playClick();
+  currentStage=s; queue=shuffle(WORDS); wrongQueue=[]; isRetryMode=false;
+  idx=0; correctCount=0; wrongCount=0;
+  document.getElementById('study-label').textContent=stageNames[s];
+  document.getElementById('retry-banner').classList.remove('show');
+  showScreen('screen-study');
+  render();
+}
+
+function updateProgress(){
+  const pct=queue.length>0?(idx/queue.length)*100:0;
+  document.getElementById('prog').style.width=pct+'%';
+  document.getElementById('word-counter').textContent=idx+' / '+queue.length;
+}
+
+function render(){
+  if(idx>=queue.length){
+    if(wrongQueue.length>0&&!isRetryMode){
+      isRetryMode=true; queue=[...wrongQueue]; wrongQueue=[]; idx=0;
+      document.getElementById('retry-banner').classList.add('show');
+      render(); return;
+    }
+    stageDone[currentStage]=true;
+    playFanfare(); showComplete(); return;
+  }
+  updateProgress();
+  const w=queue[idx];
+  if(currentStage===1) renderFC(w);
+  else if(currentStage===2) renderQ2(w);
+  else if(currentStage===3) renderQ3(w);
+  else if(currentStage===4) renderCopy(w);
+  else if(currentStage===5) renderSent(w);
+  else if(currentStage===6) renderW4(w);
+  else if(currentStage===7) renderW5(w);
+  else renderFill(w);
+}
+
+// 1단계 플래시카드
+let fcFlipped=false;
+function renderFC(w){
+  fcFlipped=false;
+  const safeWord=w.word.replace(/'/g,"\\'");
+  document.getElementById('study-content').innerHTML=`
+    <div class="flashcard-wrap">
+      <div class="flashcard" id="fc" onclick="flipCard()">
+        <div class="card-face card-front">
+          <div class="card-hint">카드를 탭해서 뒤집기</div>
+          <div class="card-word">${w.word}</div>
+          <div class="card-pron">${w.pron||''}</div>
+          <button class="sound-btn" onclick="event.stopPropagation();speak('${safeWord}')">🔊 발음 듣기</button>
+        </div>
+        <div class="card-face card-back">
+          <div class="card-hint">뜻</div>
+          <div class="card-meaning">${w.meaning}</div>
+          ${w.ex?`<div class="card-example">${w.ex}</div><div class="card-example-kr">${w.exKr||''}</div>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="fc-controls">
+      <button class="fc-btn" onclick="fcNext(false)">❌ 몰랐어요</button>
+      <button class="fc-btn primary" onclick="fcNext(true)">✅ 알았어요</button>
+    </div>`;
+  speak(w.word);
+}
+function flipCard(){
+  playClick(); fcFlipped=!fcFlipped;
+  document.getElementById('fc').classList.toggle('flipped',fcFlipped);
+  if(fcFlipped){ const w=queue[idx]; if(w&&w.ex) speak(w.ex); }
+  else if(window.speechSynthesis) speechSynthesis.cancel();
+}
+function fcNext(knew){ playClick(); if(!knew) wrongQueue.push(queue[idx]); idx++; render(); }
+
+// 선택지 생성
+function makeChoices(w,field){
+  const correct=w[field];
+  const pool=WORDS.filter(x=>x[field]!==correct);
+  return shuffle([correct,...shuffle(pool).slice(0,3).map(x=>x[field])]);
+}
+function esc(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+// 2단계: 영→한
+function renderQ2(w){
+  const choices=makeChoices(w,'meaning');
+  document.getElementById('study-content').innerHTML=`
+    <div class="quiz-word">
+      <div class="card-hint">이 단어의 한국어 뜻은?</div>
+      <div class="quiz-word-text">${w.word}</div>
+      <div class="quiz-word-pron">${w.pron||''}</div>
+      <button class="sound-btn" onclick="speak('${esc(w.word)}')">🔊 발음</button>
+    </div>
+    <div class="choices">${choices.map(c=>`<button class="choice-btn" onclick="pickKr(this,'${esc(c)}','${esc(w.meaning)}')">${c}</button>`).join('')}</div>
+    <div class="feedback" id="fb"></div>
+    <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
+}
+function pickKr(btn,chosen,correct){
+  playClick();
+  document.querySelectorAll('.choice-btn').forEach(b=>b.disabled=true);
+  const fb=document.getElementById('fb'), nb=document.getElementById('nb');
+  if(chosen===correct){
+    playCorrect(); btn.classList.add('correct');
+    fb.innerHTML='✅ 정답!'; fb.className='feedback correct-fb show';
+    correctCount++;
+  } else {
+    playWrong(); btn.classList.add('wrong');
+    document.querySelectorAll('.choice-btn').forEach(b=>{ if(b.textContent===correct) b.classList.add('correct'); });
+    fb.innerHTML=`❌ 오답! 정답: <b>${correct}</b>`; fb.className='feedback wrong-fb show';
+    wrongQueue.push(queue[idx]); wrongCount++;
+  }
+  nb.classList.add('show');
+}
+
+// 3단계: 한→영
+function renderQ3(w){
+  const choices=makeChoices(w,'word');
+  document.getElementById('study-content').innerHTML=`
+    <div class="quiz-word">
+      <div class="card-hint">이 뜻의 영어 단어는?</div>
+      <div class="quiz-word-text" style="font-size:22px;line-height:1.5">${w.meaning}</div>
+    </div>
+    <div class="choices">${choices.map(c=>`<button class="choice-btn" onclick="pickEn(this,'${esc(c)}','${esc(w.word)}')">${c}</button>`).join('')}</div>
+    <div class="feedback" id="fb"></div>
+    <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
+}
+function pickEn(btn,chosen,correct){
+  playClick();
+  document.querySelectorAll('.choice-btn').forEach(b=>b.disabled=true);
+  const fb=document.getElementById('fb'), nb=document.getElementById('nb');
+  if(chosen.trim().toLowerCase()===correct.trim().toLowerCase()){
+    playCorrect(); btn.classList.add('correct');
+    fb.innerHTML='✅ 정답!'; fb.className='feedback correct-fb show';
+    correctCount++; speak(correct);
+  } else {
+    playWrong(); btn.classList.add('wrong');
+    document.querySelectorAll('.choice-btn').forEach(b=>{ if(b.textContent.trim().toLowerCase()===correct.trim().toLowerCase()) b.classList.add('correct'); });
+    fb.innerHTML=`❌ 오답! 정답: <b>${correct}</b>`; fb.className='feedback wrong-fb show';
+    wrongQueue.push(queue[idx]); wrongCount++;
+  }
+  nb.classList.add('show');
+}
+
+// 4단계: 따라 쓰기 (영어/뜻을 보면서 두 칸에 입력)
+function renderCopy(w){
+  document.getElementById('study-content').innerHTML=`
+    <div class="copy-pair">
+      <div class="copy-side">
+        <div class="card-hint">ENGLISH</div>
+        <div class="copy-word">${w.word}</div>
+        <div class="quiz-word-pron">${w.pron||''}</div>
+        <button class="sound-btn" onclick="speak('${esc(w.word)}')">🔊 발음</button>
+      </div>
+      <div class="copy-side">
+        <div class="card-hint">한국어</div>
+        <div class="copy-mean">${w.meaning}</div>
+      </div>
+    </div>
+    <div class="input-section">
+      <input class="answer-input" id="ans-en" placeholder="① 영어 단어를 따라 쓰세요" autocomplete="off" autocapitalize="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter'&&!event.isComposing){ event.preventDefault(); document.getElementById('ans-kr').focus(); }">
+      <input class="answer-input" id="ans-kr" placeholder="② 한국어 뜻을 따라 쓰세요" autocomplete="off"
+        onkeydown="if(event.key==='Enter'&&!event.isComposing){ event.preventDefault(); checkCopy(); }">
+      <button class="submit-btn" onclick="checkCopy()">확인 (Enter)</button>
+    </div>
+    <div class="feedback" id="fb"></div>
+    <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
+  speak(w.word);
+  setTimeout(()=>{ const el=document.getElementById('ans-en'); if(el) el.focus(); },50);
+}
+function checkCopy(){
+  const w=queue[idx];
+  const en=document.getElementById('ans-en'), kr=document.getElementById('ans-kr');
+  const enV=en.value.trim().toLowerCase(), krV=kr.value.trim();
+  if(!enV){ en.focus(); return; }
+  if(!krV){ kr.focus(); return; }
+  const enOk=enV===w.word.trim().toLowerCase();
+  const krOk=judgeKr(krV,w.meaning)!=='wrong';
+  const rest=krOk?otherSenses(krV,w.meaning):[];
+  const fb=document.getElementById('fb'), nb=document.getElementById('nb');
+  en.disabled=true; kr.disabled=true;
+  en.classList.add(enOk?'correct':'wrong'); kr.classList.add(krOk?'correct':'wrong');
+  if(enOk&&krOk){
+    playCorrect(); fb.innerHTML='✅ 잘 썼어요! (Enter로 다음)'+(rest.length?`<br><span style="font-size:13px">💡 뜻이 하나 더 있어요: <b>${rest.join(' / ')}</b></span>`:''); fb.className='feedback correct-fb show'; correctCount++;
+  } else {
+    playWrong();
+    fb.innerHTML=`❌ 다시 확인해요<br><span style="font-size:13px">정답: <b>${w.word}</b> · <b>${w.meaning}</b></span>`;
+    fb.className='feedback wrong-fb show'; wrongQueue.push(queue[idx]); wrongCount++;
+  }
+  nb.classList.add('show');
+}
+
+// 5단계: 문장 따라 쓰기 (예문 + 해석을 보고 영어 문장만 입력)
+function renderSent(w){
+  if(!w.ex){ idx++; render(); return; }
+  document.getElementById('study-content').innerHTML=`
+    <div class="quiz-word" style="text-align:left">
+      <div class="card-hint">예문을 보고 영어 문장을 따라 쓰세요</div>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <span style="font-size:24px;font-weight:800">${w.word}</span>
+        <span style="font-size:16px;font-weight:700;color:var(--accent)">${w.meaning}</span>
+      </div>
+      <div style="font-size:18px;line-height:1.8;font-weight:700;margin-bottom:8px">${w.ex}</div>
+      <div style="font-size:14px;color:var(--muted)">${w.exKr||''}</div>
+      <button class="sound-btn" onclick="speak(queue[idx].ex)">🔊 문장 듣기</button>
+    </div>
+    <div class="input-section">
+      <input class="answer-input" id="ans" placeholder="영어 문장을 따라 쓰세요..." autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.isComposing)checkSent()">
+      <button class="submit-btn" onclick="checkSent()">확인 (Enter)</button>
+    </div>
+    <div class="feedback" id="fb"></div>
+    <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
+  speak(w.ex);
+  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); },50);
+}
+function checkSent(){
+  const w=queue[idx];
+  const input=document.getElementById('ans').value;
+  if(!input.trim()) return;
+  const norm=t=>t.toLowerCase().replace(/[’‘]/g,"'").replace(/[.,!?;:"“”]/g,'').replace(/\s+/g,' ').trim();
+  const fb=document.getElementById('fb'), nb=document.getElementById('nb');
+  const ansEl=document.getElementById('ans'); ansEl.disabled=true;
+  if(norm(input)===norm(w.ex)){
+    playCorrect(); ansEl.classList.add('correct');
+    fb.innerHTML='✅ 잘 썼어요! (Enter로 다음)'; fb.className='feedback correct-fb show'; correctCount++;
+  } else {
+    playWrong(); ansEl.classList.add('wrong');
+    fb.innerHTML=`❌ 다시 확인해요<br><span style="font-size:13px">정답: <b>${w.ex}</b></span>`;
+    fb.className='feedback wrong-fb show'; wrongQueue.push(queue[idx]); wrongCount++;
+  }
+  nb.classList.add('show');
+}
+
+// 6단계: 한글 뜻 쓰기
+function renderW4(w){
+  document.getElementById('study-content').innerHTML=`
+    <div class="quiz-word">
+      <div class="card-hint">한국어 뜻을 입력하세요</div>
+      <div class="quiz-word-text">${w.word}</div>
+      <div class="quiz-word-pron">${w.pron||''}</div>
+      <button class="sound-btn" onclick="speak('${esc(w.word)}')">🔊 발음</button>
+    </div>
+    <div class="input-section">
+      <input class="answer-input" id="ans" placeholder="한국어 뜻 입력..." onkeydown="if(event.key==='Enter'&&!event.isComposing)checkW4()">
+      <button class="submit-btn" onclick="checkW4()">확인</button>
+    </div>
+    <div class="feedback" id="fb"></div>
+    <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
+  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); },50);
+}
+function checkW4(){
+  const w=queue[idx];
+  const input=document.getElementById('ans').value.trim();
+  if(!input) return;
+  const result=judgeKr(input,w.meaning);
+  const fb=document.getElementById('fb'), nb=document.getElementById('nb');
+  const ansEl=document.getElementById('ans'); ansEl.disabled=true;
+  if(result!=='wrong'){
+    playCorrect(); ansEl.classList.add('correct');
+    const rest=otherSenses(input,w.meaning);
+    fb.innerHTML=`✅ 정답!<br><span style="font-size:13px;opacity:0.85">정답: ${w.meaning}</span>`
+      +(rest.length?`<br><span style="font-size:13px">💡 뜻이 하나 더 있어요: <b>${rest.join(' / ')}</b></span>`:'');
+    fb.className='feedback correct-fb show'; correctCount++;
+  } else {
+    playWrong(); ansEl.classList.add('wrong');
+    fb.innerHTML=`❌ 오답!<br><span style="font-size:13px">정답: <b>${w.meaning}</b></span>`;
+    fb.className='feedback wrong-fb show'; wrongQueue.push(queue[idx]); wrongCount++;
+  }
+  nb.classList.add('show');
+}
+
+// 뜻 판별: "/" 로 구분된 것은 서로 다른 뜻, "," 는 같은 뜻의 키워드
+function senseHits(input, meaning){
+  const strip=s=>s.replace(/\(.*?\)/g,'').replace(/~/g,'').trim();
+  const senses=meaning.split('/').map(x=>x.trim()).filter(Boolean);
+  const inputParts=input.split(/[\/,;|\s]+/).map(x=>x.trim()).filter(Boolean);
+  const hits=senses.map(sn=>sn.split(/[,;]/).map(strip).filter(Boolean).some(mp=>
+    inputParts.some(ip=>ip===mp||(ip.length>=2&&mp.length>=2&&(mp.includes(ip)||ip.includes(mp))))));
+  return {senses,hits};
+}
+function judgeKr(input, meaning){
+  const {hits}=senseHits(input,meaning);
+  const n=hits.filter(Boolean).length;
+  if(n===0) return 'wrong';
+  return n===hits.length?'correct':'partial'; // partial = 정답 인정 + 다른 뜻 안내
+}
+function otherSenses(input, meaning){
+  const {senses,hits}=senseHits(input,meaning);
+  return senses.filter((_,i)=>!hits[i]);
+}
+
+// 7단계: 영어 단어 쓰기
+function renderW5(w){
+  document.getElementById('study-content').innerHTML=`
+    <div class="quiz-word">
+      <div class="card-hint">영어 단어를 입력하세요</div>
+      <div class="quiz-word-text" style="font-size:22px;line-height:1.5">${w.meaning}</div>
+    </div>
+    <div class="input-section">
+      <input class="answer-input" id="ans" placeholder="영어 단어 입력..." onkeydown="if(event.key==='Enter'&&!event.isComposing)checkW5()">
+      <button class="submit-btn" onclick="checkW5()">확인</button>
+    </div>
+    <div class="feedback" id="fb"></div>
+    <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
+  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); },50);
+}
+function checkW5(){
+  const w=queue[idx];
+  const input=document.getElementById('ans').value.trim().toLowerCase();
+  if(!input) return;
+  const correct=w.word.trim().toLowerCase();
+  const fb=document.getElementById('fb'), nb=document.getElementById('nb');
+  const ansEl=document.getElementById('ans'); ansEl.disabled=true;
+  if(input===correct){
+    playCorrect(); ansEl.classList.add('correct');
+    fb.innerHTML='✅ 정답!'; fb.className='feedback correct-fb show';
+    correctCount++; speak(w.word);
+  } else {
+    playWrong(); ansEl.classList.add('wrong');
+    fb.innerHTML=`❌ 오답!<br><span style="font-size:13px">정답: <b>${w.word}</b></span>`;
+    fb.className='feedback wrong-fb show'; wrongQueue.push(queue[idx]); wrongCount++;
+  }
+  nb.classList.add('show');
+}
+
+// 8단계: 빈칸 채우기
+function renderFill(w){
+  if(!w.ex){ idx++; render(); return; }
+  const re=new RegExp(w.word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i');
+  const blank=w.ex.replace(re,'______');
+  document.getElementById('study-content').innerHTML=`
+    <div class="quiz-word" style="text-align:left">
+      <div class="card-hint">빈칸에 알맞은 단어를 입력하세요</div>
+      <div style="font-size:18px;line-height:1.9;font-weight:600;margin-bottom:10px">${blank}</div>
+      <div style="font-size:13px;color:var(--muted)">${w.exKr||''}</div>
+    </div>
+    <div class="input-section">
+      <input class="answer-input" id="ans" placeholder="영어 단어 입력..." onkeydown="if(event.key==='Enter'&&!event.isComposing)checkFill()">
+      <button class="submit-btn" onclick="checkFill()">확인</button>
+    </div>
+    <div class="feedback" id="fb"></div>
+    <button class="next-btn" id="nb" onclick="nextWord()">다음 →</button>`;
+  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); },50);
+}
+function checkFill(){
+  const w=queue[idx];
+  const input=document.getElementById('ans').value.trim().toLowerCase();
+  if(!input) return;
+  const correct=w.word.trim().toLowerCase();
+  const fb=document.getElementById('fb'), nb=document.getElementById('nb');
+  const ansEl=document.getElementById('ans'); ansEl.disabled=true;
+  if(input===correct){
+    playCorrect(); ansEl.classList.add('correct');
+    fb.innerHTML=`✅ 정답!<br><span style="font-size:13px;margin-top:4px;display:block">${w.ex}</span>`;
+    fb.className='feedback correct-fb show'; correctCount++;
+    speak(w.ex); // 예문 전체 발음
+  } else {
+    playWrong(); ansEl.classList.add('wrong');
+    fb.innerHTML=`❌ 오답!<br><span style="font-size:13px">정답: <b>${w.word}</b><br>${w.ex}</span>`;
+    fb.className='feedback wrong-fb show'; wrongQueue.push(queue[idx]); wrongCount++;
+  }
+  nb.classList.add('show');
+}
+
+function nextWord(){ playClick(); idx++; render(); }
+
+// 완료
+function showComplete(){
+  document.getElementById('comp-title').textContent=stageNames[currentStage]+' 완료! 🎉';
+  document.getElementById('comp-sub').textContent=`총 ${WORDS.length}개 단어 학습 완료`;
+  document.getElementById('sc-ok').textContent=correctCount;
+  document.getElementById('sc-no').textContent=wrongCount;
+  document.getElementById('sc-tot').textContent=WORDS.length;
+  showScreen('screen-complete');
+}
+
+// 음성 목록 미리 로드
+if(window.speechSynthesis){ speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices(); speechSynthesis.getVoices(); }
+
+// Enter로 다음 단어로 넘어가기 (입력칸/버튼 포커스 중이 아닐 때)
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'||e.isComposing) return;
+  if(!document.getElementById('screen-study').classList.contains('active')) return;
+  const nb=document.getElementById('nb');
+  if(!nb||!nb.classList.contains('show')) return;
+  const t=e.target;
+  if(t.tagName==='INPUT'||(t.tagName==='BUTTON'&&!t.classList.contains('choice-btn'))) return;
+  e.preventDefault(); nextWord();
+});
+
+// ===== 단어장 목록 + 불러오기 (엑셀/CSV) =====
+const DEFAULT_WORDS=JSON.parse(JSON.stringify(WORDS));
+let lists=[{id:'default',name:'해커스 영단어 1',icon:'📚',tag:'학술',words:DEFAULT_WORDS,builtin:true}];
+const doneMap={};
+try{
+  const sv=JSON.parse(localStorage.getItem('vm_lists')||'null');
+  if(Array.isArray(sv)) sv.forEach(l=>{ if(l&&l.id&&Array.isArray(l.words)&&l.words.length) lists.push({id:l.id,name:l.name||'내 단어장',icon:'📄',words:l.words}); });
+}catch(e){}
+function saveLists(){
+  try{ localStorage.setItem('vm_lists',JSON.stringify(lists.filter(l=>!l.builtin).map(l=>({id:l.id,name:l.name,words:l.words})))); }catch(e){}
+}
+function setWords(arr){ WORDS.length=0; arr.forEach(x=>WORDS.push(x)); }
+function escH(t){ return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function renderHome(){
+  document.getElementById('list-container').innerHTML=lists.map(l=>`
+    <div class="list-card" onclick="openList('${l.id}')">
+      <div class="list-icon">${l.icon}</div>
+      <div><div class="list-name">${escH(l.name)}</div><div class="list-meta">${l.tag?l.tag+' · ':''}${l.words.length}개 단어</div></div>
+      ${l.builtin?'':`<button class="list-del" title="삭제" onclick="event.stopPropagation();deleteList('${l.id}')">🗑</button>`}
+      <div class="list-arrow">›</div>
+    </div>`).join('');
+}
+function openList(id){
+  const l=lists.find(x=>x.id===id); if(!l) return;
+  setWords(l.words);
+  stageDone=doneMap[id]=doneMap[id]||{};
+  document.getElementById('stage-title').textContent=l.name;
+  selectList();
+}
+function deleteList(id){
+  const l=lists.find(x=>x.id===id); if(!l||l.builtin) return;
+  if(!confirm(`"${l.name}" 단어장을 삭제할까요?`)) return;
+  lists=lists.filter(x=>x.id!==id); delete doneMap[id]; saveLists(); renderHome();
+}
+function impMsg(t,cls){ const m=document.getElementById('imp-msg'); m.textContent=t; m.className='imp-msg '+(cls||''); }
+
+function parseCSV(text){
+  const rows=[]; let row=[],cur='',q=false;
+  const delim=text.split('\n')[0].includes('\t')?'\t':',';
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true;
+    else if(c===delim){ row.push(cur); cur=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; }
+    else cur+=c;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+function decodeText(buf){
+  try{ return new TextDecoder('utf-8',{fatal:true}).decode(buf).replace(/^\uFEFF/,''); }
+  catch(e){ return new TextDecoder('euc-kr').decode(buf); } // 엑셀 기본 CSV(CP949)
+}
+async function importFile(inp){
+  const f=inp.files[0]; inp.value=''; if(!f) return;
+  try{
+    const buf=await f.arrayBuffer(); let rows;
+    if(/\.(xlsx|xls)$/i.test(f.name)){
+      if(!window.XLSX) throw new Error('엑셀 라이브러리를 불러오지 못했어요. CSV로 저장해서 올려 주세요.');
+      const wb=XLSX.read(buf,{type:'array'});
+      rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+    } else rows=parseCSV(decodeText(buf));
+    const head=['word','단어','영단어','english','영어'];
+    const list=[], seen=new Set();
+    rows.forEach((r,i)=>{
+      const c=r.map(x=>String(x==null?'':x).trim());
+      if(i===0&&head.includes(c[0].toLowerCase())) return;
+      if(!c[0]||!c[1]||seen.has(c[0].toLowerCase())) return;
+      seen.add(c[0].toLowerCase());
+      list.push({word:c[0],meaning:c[1],pron:c[2]||'',ex:c[3]||'',exKr:c[4]||''});
+    });
+    if(!list.length) throw new Error('읽을 수 있는 단어가 없어요. A열(단어), B열(뜻)이 채워져 있는지 확인해 주세요.');
+    const base=f.name.replace(/\.[^.]+$/,'');
+    const name=prompt(`새 단어장 이름을 정해 주세요 (${list.length}개 단어)`,base);
+    if(name===null){ impMsg('취소했어요.'); return; }
+    lists.push({id:'l'+Date.now(),name:name.trim()||base,icon:'📄',words:list});
+    saveLists(); renderHome();
+    impMsg(`✅ "${name.trim()||base}" 단어장을 만들었어요 (${list.length}개 단어).`+(list.length<4?' ⚠️ 4지선다는 단어가 4개 이상일 때 잘 동작해요.':''),'ok');
+  }catch(e){ impMsg('❌ '+e.message,'err'); }
+}
+function downloadTemplate(){
+  const csv='\uFEFFword,meaning,pron,ex,exKr\n'
+    +'dominant,"우세한, 주요한",ˈdɒmɪnənt,English has become the dominant language.,영어는 지배적인 언어가 되었다.\n';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='단어_양식.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+// 홈 단어장 목록 표시
+renderHome();
+</script>
+</body>
+</html>
